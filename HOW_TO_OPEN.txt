@@ -1,0 +1,17 @@
+Cómo entrar al sitio (opciones)
+
+1) Abrir con demo (auto-desbloquea):
+   https://raw.githack.com/Sebass124432/nexx.web/main/index.html?demo=1
+
+2) Abrir con código en la URL (reemplaza CODE):
+   https://raw.githack.com/Sebass124432/nexx.web/main/index.html?unlock=gil
+
+3) Desde la consola del navegador (DevTools) ejecutar:
+   enterSite('gil')
+
+4) Atajo en la página: presiona Ctrl+U y escribe el código ("gil").
+
+Notas:
+- La contraseña por defecto es: gil
+- Para servir localmente: git clone ... && python3 -m http.server 9000
+- El archivo `assets/ghost-hands.gif` ya está incluido para el fondo.

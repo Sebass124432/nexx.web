@@ -390,13 +390,29 @@
     // Mostrar botón 'Ir a Juegos' cuando se desbloquea
     const gotoBtn = document.getElementById('gotoGamesBtn');
 
+    // función interna para desbloquear UI
+    function internalUnlock(){
+      overlay.classList.add('hidden');
+      document.body.style.overflow = 'auto';
+      gotoBtn.classList.remove('hidden');
+    }
+
+    // auto-desbloqueo vía query string (?demo=1 or ?unlock=CODE)
+    function checkQueryUnlock(){
+      try{
+        const p = new URLSearchParams(window.location.search);
+        if(p.get('demo') === '1') return internalUnlock();
+        const code = p.get('unlock');
+        if(code && code === secretPassword) return internalUnlock();
+      }catch(e){}
+    }
+    checkQueryUnlock();
+
     function unlock(event) {
       if (event) event.preventDefault();
       const value = passwordInput.value.trim();
       if (value === secretPassword) {
-        overlay.classList.add('hidden');
-        document.body.style.overflow = 'auto';
-        gotoBtn.classList.remove('hidden');
+        internalUnlock();
       } else {
         errorMessage.classList.remove('hidden');
         passwordInput.classList.add('shake');
@@ -428,6 +444,17 @@
     gotoBtn.addEventListener('click', ()=>{
       const target = document.getElementById('mainContent');
       playWipeThenScroll(target);
+    });
+
+    // Exponer función para entrar desde la consola: enterSite('gil')
+    window.enterSite = function(code){ if(code === secretPassword) internalUnlock(); };
+
+    // Atajo: Ctrl+U para pedir código y entrar
+    window.addEventListener('keydown', (e)=>{
+      if(e.ctrlKey && (e.key === 'u' || e.key === 'U')){
+        const c = prompt('Código para entrar:');
+        if(c) window.enterSite(c.trim());
+      }
     });
   </script>
 </body>
