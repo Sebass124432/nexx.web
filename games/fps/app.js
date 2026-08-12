@@ -28,10 +28,13 @@
   const startBtn = document.getElementById('startBtn');
   if(startBtn){ startBtn.addEventListener('click', async (e)=>{
       e.preventDefault(); startBtn.disabled = true; startBtn.textContent = 'Entrando...';
+      // crear/limpiar mensaje de estado
+      let status = document.getElementById('startStatus'); if(!status){ status = document.createElement('div'); status.id='startStatus'; status.style.color='#fff'; status.style.marginTop='8px'; status.style.fontSize='14px'; startBtn.parentElement.appendChild(status); }
+      status.textContent = '';
       // intentar fullscreen en el elemento principal
       try{
         if(!document.fullscreenElement){
-          const el = document.documentElement;
+          const el = renderer && renderer.domElement ? renderer.domElement : document.documentElement;
           if(el.requestFullscreen) await el.requestFullscreen();
           else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
         }
@@ -39,11 +42,17 @@
       // intentar pointer lock directo en el canvas/domElement
       try{
         if(renderer && renderer.domElement && renderer.domElement.requestPointerLock){
+          renderer.domElement.focus && renderer.domElement.focus();
           renderer.domElement.requestPointerLock();
         }
       }catch(err){ console.warn('requestPointerLock falló', err); }
       // fallback: forzar controls.lock si no se adquirió el pointer lock en 500ms
-      setTimeout(()=>{ try{ if(document.pointerLockElement !== renderer.domElement) controls.lock(); }catch(e){} }, 500);
+      setTimeout(()=>{
+        try{
+          if(document.pointerLockElement !== renderer.domElement){ controls.lock(); status.textContent = 'Solicitando bloqueo del puntero...'; }
+          else { status.textContent = ''; startBtn.style.display='none'; }
+        }catch(e){ console.warn(e); status.textContent = 'No se pudo activar el puntero.'; startBtn.disabled=false; startBtn.textContent='Iniciar Juego (Pantalla completa)'; }
+      }, 500);
   }); }
   controls.addEventListener('lock', ()=>{ blocker.style.display='none'; });
   controls.addEventListener('unlock', ()=>{ blocker.style.display='flex'; });
@@ -94,15 +103,19 @@
   const roofGeo = new THREE.BoxGeometry(1,0.6,1);
   const instanceMatrices = [];
   const instanceRoofMatrices = [];
+  const housePositions = [];
   const grid = 30; const spacing = 12;
   for(let i=-grid;i<=grid;i++){
     for(let j=-grid;j<=grid;j++){
       if(Math.random() < 0.18){
         const w = 4 + Math.random()*8; const d = 4 + Math.random()*8; const h = 3 + Math.random()*6;
-        const mx = new THREE.Matrix4(); mx.compose(new THREE.Vector3(i*spacing + (Math.random()-0.5)*3, h/2, j*spacing + (Math.random()-0.5)*3), new THREE.Quaternion(), new THREE.Vector3(w, h, d));
+        const px = i*spacing + (Math.random()-0.5)*3;
+        const pz = j*spacing + (Math.random()-0.5)*3;
+        const mx = new THREE.Matrix4(); mx.compose(new THREE.Vector3(px, h/2, pz), new THREE.Quaternion(), new THREE.Vector3(w, h, d));
         instanceMatrices.push(mx);
-        const rm = new THREE.Matrix4(); rm.compose(new THREE.Vector3(mx.elements[12], h+0.3, mx.elements[14]), new THREE.Quaternion(), new THREE.Vector3(w+0.5, 0.6, d+0.5));
+        const rm = new THREE.Matrix4(); rm.compose(new THREE.Vector3(px, h+0.3, pz), new THREE.Quaternion(), new THREE.Vector3(w+0.5, 0.6, d+0.5));
         instanceRoofMatrices.push(rm);
+        housePositions.push({x:px,z:pz,w:w,d:d});
       }
     }
   }
@@ -199,6 +212,8 @@
   function updateHUD(){ document.getElementById('hp').textContent = 'Salud: '+Math.max(0,Math.floor(player.health)); }
 
   // game loop
+  // minimap setup
+  const mapSize = 200; const mapCanvas = document.createElement('canvas'); mapCanvas.width = mapSize; mapCanvas.height = mapSize; mapCanvas.style.position='fixed'; mapCanvas.style.right='12px'; mapCanvas.style.bottom='12px'; mapCanvas.style.zIndex='4'; mapCanvas.style.borderRadius='8px'; mapCanvas.style.background='rgba(0,0,0,0.35)'; mapCanvas.style.boxShadow='0 6px 20px rgba(0,0,0,0.6)'; document.body.appendChild(mapCanvas); const mapCtx = mapCanvas.getContext('2d');
   let prev = performance.now(); function animate(){ const now = performance.now(); const dt = (now - prev)/1000; prev = now;
     // movement
     if(controls.isLocked===true){ const dir = new THREE.Vector3(); const forward = (keys['KeyW']?1:0)-(keys['KeyS']?1:0); const right = (keys['KeyD']?1:0)-(keys['KeyA']?1:0);
@@ -213,6 +228,26 @@
 
     updateEnemies(dt);
     updateHUD();
+    // actualizar minimapa
+    try{
+      const ctx = mapCtx; ctx.clearRect(0,0,mapSize,mapSize);
+      // world bounds
+      const worldRadius = Math.max(grid*spacing, 200);
+      const scale = (mapSize*0.45) / worldRadius;
+      // draw houses
+      ctx.fillStyle = '#9b9b9b';
+      for(let i=0;i<housePositions.length;i++){
+        const h = housePositions[i]; const mx = mapSize/2 + h.x * scale; const mz = mapSize/2 + h.z * scale; ctx.fillRect(mx-1, mz-1, 2, 2);
+      }
+      // draw enemies
+      ctx.fillStyle = '#ff6b6b';
+      for(let i=0;i<enemies.length;i++){ const e = enemies[i]; if(!e.visible) continue; const mx = mapSize/2 + e.position.x * scale; const mz = mapSize/2 + e.position.z * scale; ctx.fillRect(mx-2, mz-2, 4,4); }
+      // draw player
+      const p = controls.getObject().position; const px = mapSize/2 + p.x * scale; const pz = mapSize/2 + p.z * scale;
+      ctx.fillStyle = '#8bf'; ctx.beginPath(); ctx.arc(px,pz,4,0,Math.PI*2); ctx.fill();
+      // direction
+      const dir = new THREE.Vector3(); camera.getWorldDirection(dir); ctx.strokeStyle='#8bf'; ctx.beginPath(); ctx.moveTo(px,pz); ctx.lineTo(px + dir.x*10, pz + dir.z*10); ctx.stroke();
+    }catch(e){}
     renderer.render(scene, camera);
     requestAnimationFrame(animate);
   }
