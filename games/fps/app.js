@@ -35,6 +35,26 @@
   addEventListener('keydown', e=>{ keys[e.code]=true; if(e.code==='Digit1') selectWeapon('franco'); if(e.code==='Digit2') selectWeapon('ak'); if(e.code==='Digit3') selectWeapon('escopeta'); });
   addEventListener('keyup', e=>{ keys[e.code]=false; });
 
+  // Calidad y sonido (UI en index.html)
+  const qualitySelect = document.getElementById('quality');
+  const soundToggle = document.getElementById('soundToggle');
+  let quality = qualitySelect ? qualitySelect.value : 'medium';
+  let audioEnabled = soundToggle ? soundToggle.checked : true;
+  if(qualitySelect) qualitySelect.addEventListener('change', ()=>{ quality = qualitySelect.value; applyQualitySettings(); });
+  if(soundToggle) soundToggle.addEventListener('change', ()=>{ audioEnabled = soundToggle.checked; });
+
+  // Audio simple con WebAudio
+  const AudioCtx = window.AudioContext ? new AudioContext() : null;
+  if(AudioCtx) document.addEventListener('click', ()=>{ if(AudioCtx.state === 'suspended') AudioCtx.resume(); }, {once:true});
+  function playShotSound(){ if(!AudioCtx || !audioEnabled) return; const ctx = AudioCtx; const o = ctx.createOscillator(); const g = ctx.createGain(); o.type = 'sawtooth'; o.frequency.value = 800 + Math.random()*600; g.gain.value = 0.0001; o.connect(g); g.connect(ctx.destination); g.gain.setValueAtTime(0.0001, ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.12); o.start(); o.stop(ctx.currentTime + 0.13); }
+
+  // Ajustes de calidad (se aplican antes de crear pools)
+  function applyQualitySettings(){
+    if(quality === 'high'){ maxEnemies = 32; maxTracers = 48; }
+    else if(quality === 'medium'){ maxEnemies = 24; maxTracers = 36; }
+    else { maxEnemies = 12; maxTracers = 18; }
+  }
+
   // weapons
   const weapons = {
     ak: {name:'AK', rate:0.09, damage:12, spread:0.04, auto:true},
@@ -80,7 +100,7 @@
   const enemies = [];
   const enemyGeo = new THREE.SphereGeometry(0.7, 6, 6); // menos segmentos para rendimiento
   const enemyMat = new THREE.MeshStandardMaterial({color:0xff6b6b});
-  const maxEnemies = 24;
+  let maxEnemies = 24;
   for(let i=0;i<maxEnemies;i++){
     const m = new THREE.Mesh(enemyGeo, enemyMat);
     m.position.set(0,-20,0); m.visible = false; m.health = 0; m.speed = 0; scene.add(m); enemies.push(m);
@@ -98,7 +118,7 @@
   // bullets handled as instantaneous raycasts (hitscan) and visual tracers
   // tracer pool para líneas de disparo (reutilizables)
   const tracerPool = [];
-  const maxTracers = 36;
+  let maxTracers = 36;
   for(let i=0;i<maxTracers;i++){
     const geom = new THREE.BufferGeometry();
     const positions = new Float32Array(6); geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -106,6 +126,14 @@
     const line = new THREE.Line(geom, mat); line.visible = false; scene.add(line); tracerPool.push({mesh:line, life:0});
   }
   let tracerIndex = 0;
+
+  // particle pool para muzzle flashes
+  const particlePool = [];
+  const maxFlashes = 24;
+  for(let i=0;i<maxFlashes;i++){
+    const spr = new THREE.Mesh(new THREE.PlaneGeometry(0.8,0.4), new THREE.MeshBasicMaterial({color:0xfff1c9, transparent:true, opacity:0.95, depthWrite:false})); spr.visible=false; scene.add(spr); particlePool.push({mesh:spr, life:0});
+  }
+  let particleIndex = 0;
 
   let lastShot = 0;
   let mouseDown = false;
@@ -124,10 +152,13 @@
     const hits = ray.intersectObjects(enemies, false);
     if(hits.length>0){ const hit = hits[0]; const obj = hit.object; if(obj.visible){ obj.health -= damage; if(obj.health<=0){ obj.visible = false; spawnEnemy(); } } }
     // tracer (reuse from pool)
-    const t = tracerPool[tracerIndex]; tracerIndex = (tracerIndex+1) % maxTracers;
+    const t = tracerPool[tracerIndex]; tracerIndex = (tracerIndex+1) % tracerPool.length;
     const p0 = origin; const p1 = origin.clone().add(dir.clone().multiplyScalar(60));
     const arr = t.mesh.geometry.attributes.position.array; arr[0]=p0.x; arr[1]=p0.y; arr[2]=p0.z; arr[3]=p1.x; arr[4]=p1.y; arr[5]=p1.z; t.mesh.geometry.attributes.position.needsUpdate = true;
     t.mesh.visible = true; t.life = 0.06;
+    // muzzle flash (reuse)
+    if(particlePool.length>0){ const f = particlePool[particleIndex]; particleIndex = (particleIndex+1) % particlePool.length; f.mesh.position.copy(origin); f.mesh.lookAt(origin.clone().add(dir)); f.mesh.visible = true; f.life = 0.06; }
+    if(audioEnabled) playShotSound();
   }
 
   // enemy behavior
@@ -168,13 +199,13 @@
 
   // basic damage from enemy tracers: check recent tracers
   setInterval(()=>{
-    tracers.forEach(tr=>{
-      // sample midpoint
-      const p1 = tr.mesh.geometry.attributes.position.array.slice(0,3); const p2 = tr.mesh.geometry.attributes.position.array.slice(3,6);
-      const mx = (p1[0]+p2[0])/2, my = (p1[1]+p2[1])/2, mz = (p1[2]+p2[2])/2;
+    for(let i=0;i<tracerPool.length;i++){
+      const tr = tracerPool[i]; if(!tr.mesh.visible) continue;
+      const arr = tr.mesh.geometry.attributes.position.array;
+      const mx = (arr[0]+arr[3])/2, my = (arr[1]+arr[4])/2, mz = (arr[2]+arr[5])/2;
       const pd = controls.getObject().position; const d = Math.hypot(pd.x-mx, pd.y-my, pd.z-mz);
       if(d < 1.2){ player.health -= 6; if(player.health<=0){ document.getElementById('blocker').style.display='flex'; document.getElementById('instructions').innerHTML='<h2>Has muerto</h2><p>Refresca para reiniciar</p>'; } }
-    });
+    }
   }, 120);
 
   // resize

@@ -12,6 +12,12 @@
 <body>
   <div id="blocker"><div id="instructions"><h1>FPS Nexx.web</h1><p>Click para entrar (pointer lock). WASD mover, ratón mirar, click disparar, 1/2/3 para cambiar arma.</p><p>Armas: 1 Franco, 2 AK, 3 Escopeta</p></div></div>
   <div id="hud"><div id="hp">Salud: 100</div><div id="wep">Arma: AK</div><div id="info">Bots activos</div></div>
+  <div style="position:fixed;right:12px;top:12px;z-index:3;color:#fff;font-family:Inter,Arial,Helvetica,sans-serif">
+    <div style="background:rgba(0,0,0,0.45);padding:6px 10px;border-radius:6px;margin-bottom:6px">Calidad:
+      <select id="quality"><option value="high">Alta</option><option value="medium" selected>Media</option><option value="low">Baja</option></select>
+      <label style="margin-left:8px"><input type="checkbox" id="soundToggle" checked/> Sonidos</label>
+    </div>
+  </div>
   <div id="crosshair">+</div>
 
   <!-- Three.js -->
