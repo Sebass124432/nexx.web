@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shooter - Nexx.web</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="ui">
+    <div id="hud">
+      <div id="health">Salud: 100</div>
+      <div id="weapon">Arma: AK</div>
+      <div id="info">Teclas: WASD mover · 1 Franco · 2 AK · 3 Escopeta · Click disparar</div>
+    </div>
+    <button id="startBtn">Iniciar Juego</button>
+    <div id="overlay" class="hidden">
+      <div id="message"></div>
+      <button id="restart">Reiniciar</button>
+    </div>
+  </div>
+
+  <canvas id="game"></canvas>
+
+  <script src="game.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+:root{ --bg:#05050a; --card: rgba(255,255,255,0.04); --accent:#fff }
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,Helvetica,sans-serif;background:var(--bg);color:var(--accent)}
+#game{display:block;width:100vw;height:100vh}
+#ui{position:fixed;left:0;top:0;right:0;pointer-events:none}
+#hud{display:flex;gap:1rem;padding:0.75rem;align-items:center;pointer-events:auto}
+#hud > div{background:var(--card);padding:0.5rem 0.75rem;border-radius:8px;font-weight:600}
+#startBtn{position:fixed;left:50%;top:12%;transform:translateX(-50%);padding:0.8rem 1.2rem;border-radius:10px;border:none;background:#fff;color:#05050a;font-weight:700;cursor:pointer;pointer-events:auto}
+.hidden{display:none}
+#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+#overlay #message{background:rgba(0,0,0,0.6);padding:1.2rem 1.6rem;border-radius:10px;border:1px solid rgba(255,255,255,0.06);}
+#restart{margin-left:1rem;padding:0.5rem 0.8rem;border-radius:8px;border:none;cursor:pointer}
+
+/* simple responsive */
+@media (max-width:600px){#hud{flex-direction:column;align-items:flex-start;padding:0.5rem}#startBtn{top:6%}}
