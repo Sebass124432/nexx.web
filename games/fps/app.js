@@ -26,7 +26,25 @@
   instructions.addEventListener('click', ()=>{ controls.lock(); });
   // start button: intentar fullscreen y lock
   const startBtn = document.getElementById('startBtn');
-  if(startBtn){ startBtn.addEventListener('click', async (e)=>{ e.preventDefault(); try{ if(!document.fullscreenElement){ await document.documentElement.requestFullscreen(); } controls.lock(); }catch(err){ console.warn('Fullscreen/lock failed', err); controls.lock(); } }); }
+  if(startBtn){ startBtn.addEventListener('click', async (e)=>{
+      e.preventDefault(); startBtn.disabled = true; startBtn.textContent = 'Entrando...';
+      // intentar fullscreen en el elemento principal
+      try{
+        if(!document.fullscreenElement){
+          const el = document.documentElement;
+          if(el.requestFullscreen) await el.requestFullscreen();
+          else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        }
+      }catch(err){ console.warn('Fullscreen falló', err); }
+      // intentar pointer lock directo en el canvas/domElement
+      try{
+        if(renderer && renderer.domElement && renderer.domElement.requestPointerLock){
+          renderer.domElement.requestPointerLock();
+        }
+      }catch(err){ console.warn('requestPointerLock falló', err); }
+      // fallback: forzar controls.lock si no se adquirió el pointer lock en 500ms
+      setTimeout(()=>{ try{ if(document.pointerLockElement !== renderer.domElement) controls.lock(); }catch(e){} }, 500);
+  }); }
   controls.addEventListener('lock', ()=>{ blocker.style.display='none'; });
   controls.addEventListener('unlock', ()=>{ blocker.style.display='flex'; });
   scene.add(controls.getObject());
