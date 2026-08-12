@@ -24,6 +24,9 @@
   const controls = new THREE.PointerLockControls(camera, renderer.domElement);
   const blocker = document.getElementById('blocker'); const instructions = document.getElementById('instructions');
   instructions.addEventListener('click', ()=>{ controls.lock(); });
+  // start button: intentar fullscreen y lock
+  const startBtn = document.getElementById('startBtn');
+  if(startBtn){ startBtn.addEventListener('click', async (e)=>{ e.preventDefault(); try{ if(!document.fullscreenElement){ await document.documentElement.requestFullscreen(); } controls.lock(); }catch(err){ console.warn('Fullscreen/lock failed', err); controls.lock(); } }); }
   controls.addEventListener('lock', ()=>{ blocker.style.display='none'; });
   controls.addEventListener('unlock', ()=>{ blocker.style.display='flex'; });
   scene.add(controls.getObject());
