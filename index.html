@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GIL PROYECT</title>
+  <style>
+    :root {
+      background: #05050a;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      --bg-grayscale: 0.12;
+      --bg-contrast: 1.05;
+      --bg-brightness: 1.05;
+      --bg-blur: 0px;
+      --overlay-dark: 0.32;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body, html {
+      min-height: 100%;
+      position: relative;
+      overflow: hidden;
+      background: #000;
+    }
+
+    /* Capa de fondo (GIF) con filtros aplicados solo al fondo */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: url('assets/ghost-hands.gif');
+      background-size: cover;
+      background-position: center center;
+      background-repeat: no-repeat;
+      filter: grayscale(var(--bg-grayscale)) contrast(var(--bg-contrast)) brightness(var(--bg-brightness)) blur(var(--bg-blur));
+      transform: translateZ(0);
+      z-index: 0;
+      opacity: 1;
+      pointer-events: none;
+    }
+
+    /* Overlay oscuro para legibilidad */
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(rgba(0,0,0,var(--overlay-dark)), rgba(0,0,0,0.9));
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .page {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+      position: relative;
+      z-index: 2;
+    }
+
+    .title {
+      font-size: clamp(4rem, 10vw, 10rem);
+      text-transform: uppercase;
+      letter-spacing: 0.3em;
+      text-align: center;
+      color: #fff;
+      text-shadow:
+        0 0 12px rgba(255,255,255,0.75),
+        0 0 30px rgba(255,255,255,0.45),
+        0 0 60px rgba(255,255,255,0.2);
+      animation: floatText 6s ease-in-out infinite;
+      position: relative;
+      z-index: 3;
+    }
+
+    .title span {
+      --i: 0;
+      display: inline-block;
+      position: relative;
+      padding: 0 0.06em;
+      transform-origin: center;
+      animation: letter-scan 1.2s ease-in-out infinite;
+      animation-fill-mode: both;
+      animation-delay: calc(var(--i) * 0.12s);
+    }
+
+    .subtitle {
+      margin-top: 1rem;
+      font-size: 1.15rem;
+      color: rgba(255,255,255,0.75);
+      text-align: center;
+      letter-spacing: 0.18em;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      display: grid;
+      place-items: center;
+      z-index: 10;
+      padding: 1rem;
+    }
+
+    .card {
+      width: min(480px, 100%);
+      background: rgba(10, 10, 18, 0.98);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 24px;
+      padding: 2rem;
+      box-shadow: 0 0 90px rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(18px);
+    }
+
+    .card h2 {
+      margin-bottom: 1rem;
+      font-size: 1.8rem;
+      letter-spacing: 0.15em;
+      color: #fff;
+      text-align: center;
+    }
+
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .input-group label {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.75);
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 1rem 1.1rem;
+      font-size: 1rem;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      color: #fff;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .input-group input:focus {
+      border-color: #ffffff;
+      box-shadow: 0 0 18px rgba(255,255,255,0.18);
+    }
+
+    .button {
+      width: 100%;
+      padding: 1rem 1.1rem;
+      border: none;
+      border-radius: 14px;
+      font-size: 1rem;
+      letter-spacing: 0.1em;
+      background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.65));
+      color: #05050a;
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .button:hover {
+      transform: translateY(-2px);
+      filter: brightness(1.05);
+    }
+
+    .notice {
+      margin-top: 0.85rem;
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.65);
+      text-align: center;
+    }
+
+    .error {
+      color: #ff7d7d;
+      margin-top: 0.65rem;
+      text-align: center;
+    }
+
+    .background-lines {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.22;
+    }
+
+    .background-lines::before,
+    .background-lines::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image: linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px),
+                        linear-gradient(0deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: radial-gradient(circle at center, rgba(0,0,0,1) 0%, rgba(0,0,0,0.36) 55%, rgba(0,0,0,0) 100%);
+    }
+
+    .background-lines::after {
+      transform: rotate(45deg);
+      opacity: 0.65;
+    }
+
+    @keyframes glow {
+      from {
+        text-shadow:
+          0 0 8px rgba(255,255,255,0.6),
+          0 0 24px rgba(255,255,255,0.35),
+          0 0 55px rgba(255,255,255,0.14);
+      }
+      to {
+        text-shadow:
+          0 0 16px rgba(255,255,255,0.95),
+          0 0 44px rgba(255,255,255,0.65),
+          0 0 90px rgba(255,255,255,0.25);
+      }
+    }
+
+    @keyframes flicker {
+      0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+        opacity: 1;
+        text-shadow: 0 0 12px rgba(255,255,255,0.9), 0 0 24px rgba(255,255,255,0.55), 0 0 40px rgba(255,255,255,0.25);
+      }
+      20%, 24%, 55% {
+        opacity: 0.75;
+        text-shadow: none;
+      }
+    }
+
+    @keyframes floatText {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-10px) scale(1.02); }
+    }
+
+    @keyframes letter-scan {
+      0% { transform: translateY(0) scale(1); text-shadow: none; color: rgba(255,255,255,0.85); }
+      40% { transform: translateY(-10px) scale(1.12); text-shadow: 0 0 18px rgba(255,255,255,0.95), 0 0 36px rgba(255,255,255,0.5); color: #fff; }
+      100% { transform: translateY(0) scale(1); text-shadow: none; color: rgba(255,255,255,0.85); }
+    }
+
+    /* Manos fantasma que golpean cada letra */
+    /* Hand effect removed as requested. GIF background is made more visible via :root variables. */
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="background-lines"></div>
+    <div class="title" aria-label="GIL PROYECT">
+      <span>G</span><span>I</span><span>L</span>
+      <span style="margin:0 0.35em;">P</span><span>R</span><span>O</span><span>Y</span><span>E</span><span>C</span><span>T</span>
+    </div>
+    <div class="subtitle">Acceso protegido. Ingresa la contraseña para continuar.</div>
+  </div>
+
+  <div class="overlay" id="passwordOverlay">
+    <div class="card">
+      <h2>INGRESA LA CONTRASEÑA</h2>
+      <div class="input-group">
+        <label for="password">Contraseña</label>
+        <input id="password" type="password" placeholder="Escribe aquí" autocomplete="off" />
+      </div>
+      <button class="button" id="enterButton">Entrar</button>
+      <div class="notice">Contraseña: <strong>gil</strong></div>
+      <div class="error hidden" id="errorMessage">Contraseña incorrecta. Intenta de nuevo.</div>
+    </div>
+  </div>
+
+  <main id="mainContent" style="padding:2rem; display:flex; justify-content:center;">
+    <div class="card" style="max-width:720px;">
+      <h2>Juegos</h2>
+      <p class="notice">Disfruta estos juegos sencillos.</p>
+      <div style="margin-top:1rem; display:flex; gap:1rem; flex-wrap:wrap; justify-content:center;">
+        <a class="button" href="games/rock-paper-scissors.html" style="width:auto; padding:0.9rem 1.2rem;">Piedra • Papel • Tijeras</a>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const passwordInput = document.getElementById('password');
+    const enterButton = document.getElementById('enterButton');
+    const overlay = document.getElementById('passwordOverlay');
+    const errorMessage = document.getElementById('errorMessage');
+    const secretPassword = 'gil';
+
+    // asignar índice a cada letra para la animación secuencial
+    document.querySelectorAll('.title span').forEach((s, i) => {
+      s.style.setProperty('--i', i);
+    });
+
+    function unlock(event) {
+      if (event) event.preventDefault();
+      const value = passwordInput.value.trim();
+      if (value === secretPassword) {
+        overlay.classList.add('hidden');
+        document.body.style.overflow = 'auto';
+      } else {
+        errorMessage.classList.remove('hidden');
+        passwordInput.classList.add('shake');
+        setTimeout(() => passwordInput.classList.remove('shake'), 250);
+      }
+    }
+
+    enterButton.addEventListener('click', unlock);
+    passwordInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') unlock(event);
+    });
+  </script>
+</body>
+</html>
