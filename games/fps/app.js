@@ -8,12 +8,13 @@
 
   const renderer = new THREE.WebGLRenderer({antialias:true});
   renderer.setSize(innerWidth, innerHeight);
-  renderer.shadowMap.enabled = true;
+  // Mejor rendimiento: desactivar sombras por defecto (puedes activar en equipos potentes)
+  renderer.shadowMap.enabled = false;
   document.body.appendChild(renderer.domElement);
 
   // lights
   const hemi = new THREE.HemisphereLight(0xffffff, 0x444455, 0.6); scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 0.9); dir.position.set(100,200,100); dir.castShadow=true; scene.add(dir);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.9); dir.position.set(100,200,100); dir.castShadow=false; scene.add(dir);
 
   // ground
   const groundGeo = new THREE.PlaneGeometry(2000,2000); const groundMat = new THREE.MeshStandardMaterial({color:0x222226});
@@ -45,29 +46,66 @@
 
   function selectWeapon(k){ curWeap = weapons[k]; document.getElementById('wep').textContent = 'Arma: '+curWeap.name; }
 
-  // map: many houses (boxes)
-  const houses = new THREE.Group(); scene.add(houses);
-  const houseMat = new THREE.MeshStandardMaterial({color:0x33333a, metalness:0.1, roughness:0.8});
-  const roofMat = new THREE.MeshStandardMaterial({color:0x2b2b2b});
-  const grid = 30; const spacing=12;
-  for(let i=-grid;i<=grid;i++) for(let j=-grid;j<=grid;j++){
-    if(Math.random()<0.18){
-      const w = 4+Math.random()*8; const d = 4+Math.random()*8; const h = 3+Math.random()*6;
-      const bx = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), houseMat); bx.position.set(i*spacing + (Math.random()-0.5)*3, h/2, j*spacing + (Math.random()-0.5)*3); bx.castShadow=true; bx.receiveShadow=true;
-      houses.add(bx);
-      const roof = new THREE.Mesh(new THREE.BoxGeometry(w+0.5,0.6,d+0.5), roofMat); roof.position.set(bx.position.x, h+0.3, bx.position.z); houses.add(roof);
+  // map: many houses (usamos InstancedMesh para reducir draw calls)
+  const houseMat = new THREE.MeshStandardMaterial({color:0x33333a, metalness:0.05, roughness:0.9});
+  const roofMat = new THREE.MeshStandardMaterial({color:0x2b2b2b, metalness:0.02, roughness:0.9});
+  const houseBaseGeo = new THREE.BoxGeometry(1,1,1);
+  const roofGeo = new THREE.BoxGeometry(1,0.6,1);
+  const instanceMatrices = [];
+  const instanceRoofMatrices = [];
+  const grid = 30; const spacing = 12;
+  for(let i=-grid;i<=grid;i++){
+    for(let j=-grid;j<=grid;j++){
+      if(Math.random() < 0.18){
+        const w = 4 + Math.random()*8; const d = 4 + Math.random()*8; const h = 3 + Math.random()*6;
+        const mx = new THREE.Matrix4(); mx.compose(new THREE.Vector3(i*spacing + (Math.random()-0.5)*3, h/2, j*spacing + (Math.random()-0.5)*3), new THREE.Quaternion(), new THREE.Vector3(w, h, d));
+        instanceMatrices.push(mx);
+        const rm = new THREE.Matrix4(); rm.compose(new THREE.Vector3(mx.elements[12], h+0.3, mx.elements[14]), new THREE.Quaternion(), new THREE.Vector3(w+0.5, 0.6, d+0.5));
+        instanceRoofMatrices.push(rm);
+      }
     }
   }
+  const houseCount = instanceMatrices.length;
+  const houseInst = new THREE.InstancedMesh(houseBaseGeo, houseMat, houseCount);
+  for(let k=0;k<houseCount;k++) houseInst.setMatrixAt(k, instanceMatrices[k]);
+  houseInst.instanceMatrix.needsUpdate = true;
+  scene.add(houseInst);
+  const roofInst = new THREE.InstancedMesh(roofGeo, roofMat, houseCount);
+  for(let k=0;k<houseCount;k++) roofInst.setMatrixAt(k, instanceRoofMatrices[k]);
+  roofInst.instanceMatrix.needsUpdate = true;
+  scene.add(roofInst);
 
   // enemies
+  // enemy pool (reutilizamos mallas para reducir GC y overhead)
   const enemies = [];
-  const enemyGeo = new THREE.SphereGeometry(0.7, 10,10);
+  const enemyGeo = new THREE.SphereGeometry(0.7, 6, 6); // menos segmentos para rendimiento
   const enemyMat = new THREE.MeshStandardMaterial({color:0xff6b6b});
-  function spawnEnemy(){ const e = new THREE.Mesh(enemyGeo, enemyMat); e.position.set((Math.random()-0.5)*500, 0.7, (Math.random()-0.5)*500); e.health=80; e.speed=1.5+Math.random()*1.2; e.castShadow=true; scene.add(e); enemies.push(e); }
+  const maxEnemies = 24;
+  for(let i=0;i<maxEnemies;i++){
+    const m = new THREE.Mesh(enemyGeo, enemyMat);
+    m.position.set(0,-20,0); m.visible = false; m.health = 0; m.speed = 0; scene.add(m); enemies.push(m);
+  }
+  function spawnEnemy(){
+    for(let i=0;i<enemies.length;i++){
+      const e = enemies[i]; if(e.visible) continue;
+      e.position.set((Math.random()-0.5)*500, 0.7, (Math.random()-0.5)*500);
+      e.health = 80; e.speed = 1.2 + Math.random()*1.6; e.visible = true; return e;
+    }
+    return null; // pool exhausted
+  }
   for(let i=0;i<12;i++) spawnEnemy();
 
   // bullets handled as instantaneous raycasts (hitscan) and visual tracers
-  const tracers = [];
+  // tracer pool para líneas de disparo (reutilizables)
+  const tracerPool = [];
+  const maxTracers = 36;
+  for(let i=0;i<maxTracers;i++){
+    const geom = new THREE.BufferGeometry();
+    const positions = new Float32Array(6); geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.LineBasicMaterial({color:0xffffee, linewidth:1});
+    const line = new THREE.Line(geom, mat); line.visible = false; scene.add(line); tracerPool.push({mesh:line, life:0});
+  }
+  let tracerIndex = 0;
 
   let lastShot = 0;
   let mouseDown = false;
@@ -82,26 +120,28 @@
   }
 
   function fireRay(origin, dir, damage){ const ray = new THREE.Raycaster(origin, dir.normalize(), 0, 1200);
-    // check enemies
+    // check enemies (only visible ones)
     const hits = ray.intersectObjects(enemies, false);
-    if(hits.length>0){ const hit = hits[0]; const obj = hit.object; obj.health -= damage; if(obj.health<=0){ scene.remove(obj); enemies.splice(enemies.indexOf(obj),1); spawnEnemy(); } }
-    // tracer
-    const tracerGeo = new THREE.BufferGeometry().setFromPoints([origin, origin.clone().add(dir.clone().multiplyScalar(60))]); const tracerMat = new THREE.LineBasicMaterial({color:0xffffee}); const line = new THREE.Line(tracerGeo, tracerMat); scene.add(line); tracers.push({mesh:line, life:0.06});
+    if(hits.length>0){ const hit = hits[0]; const obj = hit.object; if(obj.visible){ obj.health -= damage; if(obj.health<=0){ obj.visible = false; spawnEnemy(); } } }
+    // tracer (reuse from pool)
+    const t = tracerPool[tracerIndex]; tracerIndex = (tracerIndex+1) % maxTracers;
+    const p0 = origin; const p1 = origin.clone().add(dir.clone().multiplyScalar(60));
+    const arr = t.mesh.geometry.attributes.position.array; arr[0]=p0.x; arr[1]=p0.y; arr[2]=p0.z; arr[3]=p1.x; arr[4]=p1.y; arr[5]=p1.z; t.mesh.geometry.attributes.position.needsUpdate = true;
+    t.mesh.visible = true; t.life = 0.06;
   }
 
   // enemy behavior
-  function updateEnemies(dt){ enemies.forEach(e=>{
-    // distance to player
-    const ppos = controls.getObject().position; const dx = ppos.x - e.position.x; const dz = ppos.z - e.position.z; const dist = Math.hypot(dx,dz);
-    // move towards player
-    e.position.x += (dx/dist) * e.speed * dt * 15; e.position.z += (dz/dist) * e.speed * dt * 15;
-    // simple attack: if close and player moving, shoot
-    if(dist < 40 && (keys['KeyW']||keys['KeyA']||keys['KeyS']||keys['KeyD'])){
-      if(Math.random() < 0.005) { // enemy shoots occasionally
-        const dir = new THREE.Vector3(); dir.copy(controls.getObject().position).sub(e.position).normalize(); fireRay(e.position.clone().add(new THREE.Vector3(0,0.5,0)), dir, 8);
+  function updateEnemies(dt){
+    const ppos = controls.getObject().position;
+    for(let i=0;i<enemies.length;i++){
+      const e = enemies[i]; if(!e.visible) continue;
+      const dx = ppos.x - e.position.x; const dz = ppos.z - e.position.z; const dist = Math.hypot(dx,dz) || 1;
+      e.position.x += (dx/dist) * e.speed * dt * 15; e.position.z += (dz/dist) * e.speed * dt * 15;
+      if(dist < 40 && (keys['KeyW']||keys['KeyA']||keys['KeyS']||keys['KeyD'])){
+        if(Math.random() < 0.008) { const dir = new THREE.Vector3(); dir.copy(controls.getObject().position).sub(e.position).normalize(); fireRay(e.position.clone().add(new THREE.Vector3(0,0.5,0)), dir, 8); }
       }
     }
-  }); }
+  }
 
   // HUD update
   function updateHUD(){ document.getElementById('hp').textContent = 'Salud: '+Math.max(0,Math.floor(player.health)); }
@@ -116,8 +156,8 @@
       if(mouseDown && curWeap.auto) shoot();
       // allow semi-auto presses
     }
-    // update tracers
-    for(let i=tracers.length-1;i>=0;i--){ const t = tracers[i]; t.life -= dt; if(t.life<=0){ scene.remove(t.mesh); tracers.splice(i,1); } }
+    // update tracers pool
+    for(let i=0;i<tracerPool.length;i++){ const t = tracerPool[i]; if(t.mesh.visible){ t.life -= dt; if(t.life<=0){ t.mesh.visible = false; } } }
 
     updateEnemies(dt);
     updateHUD();
